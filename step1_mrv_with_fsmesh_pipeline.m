@@ -1,29 +1,47 @@
 clear all
 close all
 
-%% setup
+%% Setup Freesurfer
 % set your freesurfer subjects dir if you have multiple depending on the
 % project
-k_AY_base_dir = '/share/kalanit/biac2/kgs/anatomy/freesurferRecon/Kids_AcrossYears';
-setenv('SUBJECTS_DIR', k_AY_base_dir);
+% [EK]: I don't think you need this! Unless you need a specific fsaverage
+% from this folders
+% k_AY_base_dir = '/share/kalanit/biac2/kgs/anatomy/freesurferRecon/Kids_AcrossYears';
+% setenv('SUBJECTS_DIR', k_AY_base_dir);
 
-setSessions;
+%% Setup paths and toolboxes
+rootDir = '/share/kalanit/biac2/kgs/';
+baseDir = fullfile(rootDir,'projects/toonAtlas');
+cd(baseDir)
 
+addpath(genpath('./code'))
+addpath(genpath('/share/kalanit/software/vistasoft/'))
+
+%% Setup session
 % currently set up for one subject to be processed at a time
-setup.fsSession = fs_sessions{1};
-setup.vistaSession = sessions{1};
+% setSessions inputs are 
+% (1) initials: 'RJ09' or 'ENK05',
+% (2) sessionNr: 'RJ09' has 1 or 2, 'ENK05' has only 1
+% (3) (optional) testFolder: to add 'EKtest' or 'BFtest' at the end of session
+[session, fs_session] = setSessions('ENK05',1,'EKtest');
 
-setup.vistaDir ='/share/kalanit/biac2/kgs/projects/toonAtlas/tests';
-setup.fsDir='/share/kalanit/biac2/kgs/anatomy/freesurferRecon/Kids_AcrossYears';
+setup.vistaSession  = session;
+setup.fsSession     = fs_session;
+setup.vistaDataDir  = fullfile(baseDir,'tests');
+setup.fsDir         = fullfile(rootDir,'anatomy','freesurferRecon',...
+                       'Kids_AcrossYears');
 
-vistaDir = fullfile(setup.vistaDir, setup.vistaSession);
+% Create vista session folders if needed
+vistaDir = fullfile(setup.vistaDataDir, setup.vistaSession);
 if ~exist(vistaDir,'dir')
     fprintf(1,'mkdir %s \n',vistaDir)
     mkdir(vistaDir)
 end
 cd(vistaDir)
 
-anatDir = fullfile(setup.vistaDir, setup.vistaSession, '3DAnatomy');
+% Create a 3DAnatomy folder within the vista session folder to copy our t1
+% and t1_class nifti files later
+anatDir = fullfile(setup.vistaDataDir, setup.vistaSession, '3DAnatomy');
 if ~exist(anatDir,'dir')
     fprintf(1,'mkdir %s \n',anatDir)
     mkdir(anatDir)
@@ -80,13 +98,8 @@ copyfile(T1.nii, anatDir)
 copyfile(outfile, anatDir)
 
 %% initialize mrvista toon session
-% You have to be at the main "ToonAtlas" folder 
-% Question from DF - Eline did you add the above comment? I don't think
-% that should be the case
 cd(vistaDir)
-
-baseDir = '/share/kalanit/biac2/kgs/projects/toonAtlas';
-paramPath =fullfile('Stimuli','8bars_params.mat');
+paramPath = fullfile('Stimuli','8bars_params.mat');
 imgPath = fullfile('Stimuli','8bars_images.mat');
 
 toon_init(baseDir, 'tests', setup.vistaSession)
@@ -108,11 +121,13 @@ toon_motionCorrect(baseDir,'tests', setup.vistaSession);
 toon_2gray(baseDir,'tests', setup.vistaSession);
 
 %% Import FreeSurfer mesh into mrVista
-fsPath=fullfile( setup.fsDir,  setup.fsSession, 'surf')
-vistaPath=fullfile(setup.vistaDir, setup.vistaSession, '3DAnatomy')
-toon_surf2msh(fsPath, vistaPath)
+fsSurfPath = fullfile(setup.fsDir,  setup.fsSession, 'surf');
+toon_surf2msh(fsSurfPath, anatDir)
 
 %% open mrVista 3 session so you can see that everything is good
+% [EK]: it is not clear to me what you are supposed to check here, because
+% the previous block already displays the meshes...s
+
 vw = mrVista('3');
 % in the GUI set your preferences and save them
 % load a mesh to check that they are ok
@@ -125,11 +140,11 @@ toon_prfRun(baseDir, 'tests', setup.vistaSession, paramPath, imgPath)
 %  Once the CSS model is done (and you've checked in mrvista that it looks
 %  okay, you can convert the maps to freesurfer surface coords)
 smooth = 1; %smooth to match previous stages
-direct_mrvEccen2fs(fullfile(setup.vistaDir, setup.vistaSession), ...
+direct_mrvEccen2fs(fullfile(setup.vistaDir, setup.vistaSessisvon), ...
                    fullfile(setup.fsDir, setup.fsSession), smooth)
-
+               
 %% transform Kastner atlas from fsaverage space to subject space to use as a reference (optional)
 transform_KastnerAtlas;
 
-%% now you can move on the ROI drawing! (currently draw_EVC_ROIs.m)
+%% now you can move on the ROI drawing! (see script: step2_draw_EVC_ROIs.m)
 
